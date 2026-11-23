@@ -99,13 +99,16 @@ export const toolDefinitions: Groq.Chat.Completions.ChatCompletionTool[] = [
     type: "function",
     function: {
       name: "cekStatusOrder",
-      description: "Cek status pesanan customer berdasarkan order ID.",
+      description:
+        "Cek status PESANAN dan PEMBAYARAN (sudah dibayar atau belum) milik pelanggan yang sedang chat, langsung dari database. " +
+        "Panggil setiap pelanggan tanya soal status pesanan/pembayaran, atau bilang sudah bayar. " +
+        "orderId OPSIONAL (ID penuh atau kode #ABC123); jika tidak diisi, dikembalikan order terbaru pelanggan.",
       parameters: {
         type: "object",
         properties: {
-          orderId: { type: "string" },
+          orderId: { type: ["string", "null"], description: "Opsional (boleh null). ID order atau 6 karakter terakhir (kode order)." },
         },
-        required: ["orderId"],
+        required: [],
       },
     },
   },
@@ -154,7 +157,7 @@ export async function executeTool(
       );
 
     case "cekStatusOrder":
-      return cekStatusOrder(ctx.tenantId, args.orderId as string);
+      return cekStatusOrder(ctx.tenantId, ctx.customerId, (args.orderId as string | undefined) || undefined);
 
     default:
       return { error: `Tool '${name}' tidak dikenal` };
