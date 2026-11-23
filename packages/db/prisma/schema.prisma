@@ -132,6 +132,7 @@ model Order {
   status         OrderStatus   @default(PENDING_PAYMENT)
   totalAmount    Int
   checkoutMethod String        @default("qris")
+  phoneNumber    String?       @map("phone_number")
   assignedToId   String?
   assignedTo     User?         @relation("AssignedOrders", fields: [assignedToId], references: [id])
   notes          String?

@@ -112,6 +112,7 @@ CREATE TABLE orders (
   status           "OrderStatus" NOT NULL DEFAULT 'PENDING_PAYMENT',
   "totalAmount"    INTEGER       NOT NULL,
   "checkoutMethod" TEXT          NOT NULL DEFAULT 'qris',
+  phone_number     TEXT,
   "assignedToId"   TEXT          REFERENCES users(id),
   notes            TEXT,
   "createdAt"      TIMESTAMPTZ   NOT NULL DEFAULT NOW(),

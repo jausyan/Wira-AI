@@ -79,6 +79,7 @@ export interface Order {
   status: "PENDING_PAYMENT" | "PAID" | "PROCESSING" | "SHIPPED" | "DONE" | "CANCELLED";
   totalAmount: number;
   checkoutMethod: string;
+  phone_number: string | null;
   assignedToId: string | null;
   notes: string | null;
   createdAt: string;

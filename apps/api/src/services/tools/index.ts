@@ -72,8 +72,12 @@ export const toolDefinitions: Groq.Chat.Completions.ChatCompletionTool[] = [
               required: ["productId", "qty"],
             },
           },
+          phoneNumber: {
+            type: "string",
+            description: "Nomor WhatsApp pelanggan, contoh 081234567890. WAJIB: tanyakan ke pelanggan sebelum membuat order.",
+          },
         },
-        required: ["items"],
+        required: ["items", "phoneNumber"],
       },
     },
   },
@@ -100,15 +104,16 @@ export const toolDefinitions: Groq.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: "cekStatusOrder",
       description:
-        "Cek status PESANAN dan PEMBAYARAN (sudah dibayar atau belum) milik pelanggan yang sedang chat, langsung dari database. " +
-        "Panggil setiap pelanggan tanya soal status pesanan/pembayaran, atau bilang sudah bayar. " +
-        "orderId OPSIONAL (ID penuh atau kode #ABC123); jika tidak diisi, dikembalikan order terbaru pelanggan.",
+        "Cek status PESANAN dan PEMBAYARAN (sudah dibayar atau belum) langsung dari database, berdasarkan NOMOR WHATSAPP yang dipakai saat order. " +
+        "Panggil setiap pelanggan tanya status pesanan/pembayaran atau bilang sudah bayar. " +
+        "Jika pelanggan belum menyebut nomor WhatsApp-nya, TANYAKAN dulu sebelum memanggil tool ini.",
       parameters: {
         type: "object",
         properties: {
-          orderId: { type: ["string", "null"], description: "Opsional (boleh null). ID order atau 6 karakter terakhir (kode order)." },
+          phoneNumber: { type: "string", description: "Nomor WhatsApp pelanggan saat order, contoh 081234567890 atau 6281234567890." },
+          orderId: { type: ["string", "null"], description: "Opsional (boleh null). Kode order #ABC123 atau ID penuh untuk memilih satu order." },
         },
-        required: [],
+        required: ["phoneNumber"],
       },
     },
   },
@@ -146,7 +151,8 @@ export async function executeTool(
         ctx.tenantId,
         ctx.customerId,
         args.items as Array<{ productId: string; qty: number }>,
-        (args.checkoutMethod as string) ?? "qris"
+        args.phoneNumber,
+        "qris"
       );
 
     case "generatePayment":
@@ -157,7 +163,7 @@ export async function executeTool(
       );
 
     case "cekStatusOrder":
-      return cekStatusOrder(ctx.tenantId, ctx.customerId, (args.orderId as string | undefined) || undefined);
+      return cekStatusOrder(ctx.tenantId, args.phoneNumber, (args.orderId as string | undefined) || undefined);
 
     default:
       return { error: `Tool '${name}' tidak dikenal` };

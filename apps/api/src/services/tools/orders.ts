@@ -1,4 +1,5 @@
 import { supabase, type Product } from "@wira/db";
+import { normalizePhone } from "../phone";
 
 interface OrderItem {
   productId: string;
@@ -9,8 +10,17 @@ export async function buatOrder(
   tenantId: string,
   customerId: string,
   items: OrderItem[],
+  phoneNumber: unknown,
   checkoutMethod: string = "qris"
 ) {
+  const phone = normalizePhone(phoneNumber);
+  if (!phone) {
+    return {
+      success: false,
+      message: "Nomor WhatsApp pelanggan belum ada atau tidak valid. Tanyakan nomor WhatsApp pelanggan (contoh 081234567890), lalu coba lagi.",
+    };
+  }
+
   const productIds = items.map((i) => i.productId);
 
   // Ambil data produk
@@ -41,7 +51,7 @@ export async function buatOrder(
   // Insert order
   const { data: order, error: orderErr } = await supabase
     .from("orders")
-    .insert({ tenantId, customerId, totalAmount, checkoutMethod, status: "PENDING_PAYMENT" })
+    .insert({ tenantId, customerId, totalAmount, checkoutMethod, phone_number: phone, status: "PENDING_PAYMENT" })
     .select("id")
     .single();
 
@@ -75,6 +85,7 @@ export async function buatOrder(
     totalAmount,
     totalFormatted: `Rp ${totalAmount.toLocaleString("id-ID")}`,
     items: itemsWithPrice.map((i) => `${i.name} x${i.qty}`).join(", "),
+    nomorWhatsApp: phone,
     message: `Order #${order.id.slice(-6).toUpperCase()} berhasil dibuat`,
   };
 }
@@ -105,21 +116,33 @@ function derivePayment(orderStatus: string, payments: PaymentRow[]) {
 }
 
 /**
- * Cek status order + pembayaran milik customer yang sedang chat.
- * - Hanya order milik customer ini (tidak bisa mengintip order orang lain).
- * - orderId opsional: boleh ID penuh, atau 6 karakter terakhir (#ABC123). Tanpa orderId → order terbaru.
+ * Cek status order + pembayaran berdasarkan NOMOR WHATSAPP yang tersimpan di order (orders.phone_number).
+ * - phoneNumber wajib (format apa saja: 0812…, +62812…, 62812…)
+ * - orderId opsional: ID penuh atau 6 karakter terakhir (#ABC123) untuk menyaring
+ * - Data pribadi (nama, alamat) sengaja TIDAK dikembalikan — hanya status, item & total.
  */
-export async function cekStatusOrder(tenantId: string, customerId: string, orderId?: string) {
+export async function cekStatusOrder(tenantId: string, phoneNumber: unknown, orderId?: string) {
+  const phone = normalizePhone(phoneNumber);
+  if (!phone) {
+    return {
+      found: false,
+      needPhone: true,
+      message: "Nomor WhatsApp belum ada atau tidak valid. Minta pelanggan menyebutkan nomor WhatsApp yang dipakai saat order (contoh 081234567890).",
+    };
+  }
+
   const { data: orders, error } = await supabase
     .from("orders")
     .select("id, status, totalAmount, checkoutMethod, createdAt, order_items ( qty, products ( name ) )")
     .eq("tenantId", tenantId)
-    .eq("customerId", customerId)
+    .eq("phone_number", phone)
     .order("createdAt", { ascending: false })
     .limit(10);
 
   if (error) return { found: false, message: `Gagal membaca order: ${error.message}` };
-  if (!orders || orders.length === 0) return { found: false, message: "Pelanggan ini belum punya order." };
+  if (!orders || orders.length === 0) {
+    return { found: false, nomor: phone, message: `Tidak ada order dengan nomor ${phone}. Minta pelanggan memastikan nomor yang dipakai saat order.` };
+  }
 
   type OrderRow = {
     id: string; status: string; totalAmount: number; checkoutMethod: string | null; createdAt: string;
@@ -129,11 +152,11 @@ export async function cekStatusOrder(tenantId: string, customerId: string, order
 
   if (orderId && orderId.trim()) {
     const q = orderId.trim().replace(/^#/, "").toLowerCase();
-    const hit = list.filter((o) => o.id.toLowerCase() === q || o.id.toLowerCase().endsWith(q) || o.id.toLowerCase().startsWith(q));
-    if (hit.length === 0) return { found: false, message: `Order "${orderId}" tidak ditemukan untuk pelanggan ini.` };
+    const hit = list.filter((o) => o.id.toLowerCase().endsWith(q) || o.id.toLowerCase().startsWith(q));
+    if (hit.length === 0) return { found: false, nomor: phone, message: `Order "${orderId}" tidak ditemukan untuk nomor ${phone}.` };
     list = hit;
   } else {
-    list = list.slice(0, 3); // tanpa ID: tampilkan 3 order terbaru
+    list = list.slice(0, 3);
   }
 
   const { data: pays } = await supabase
@@ -158,5 +181,5 @@ export async function cekStatusOrder(tenantId: string, customerId: string, order
     };
   });
 
-  return { found: true, jumlah: result.length, orders: result };
+  return { found: true, nomor: phone, jumlah: result.length, orders: result };
 }
