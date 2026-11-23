@@ -223,6 +223,8 @@ export async function runAgent(input: AgentInput): Promise<AgentResult> {
       .replace(/<function[^>]*>[\s\S]*?<\/function>/gi, "")
       .replace(/```json[\s\S]*?```/g, "")
       .replace(/\{"name":\s*"[^"]+",\s*"parameters"[\s\S]*?\}/g, "")
+      .replace(/\*\*([^*\n]+)\*\*/g, "*$1*") // markdown **tebal** → format WhatsApp *tebal*
+      .replace(/^#{1,6}\s+/gm, "")            // heading markdown tidak didukung WhatsApp
       .trim();
     // Guard: output model melantur / bocor reasoning
     if (finalResponse.length > 1500 || /\bWe need to\b/.test(finalResponse)) {
