@@ -1,0 +1,28 @@
+# deps & build
+node_modules/
+dist/
+.next/
+.turbo/
+*.tsbuildinfo
+prisma/generated/
+
+# secrets / env
+.env
+.env.*
+!.env.example
+
+# logs & temp
+*.log
+npm-debug.log*
+.DS_Store
+*.swp
+tmp/
+
+# editor / tooling
+.vscode/
+.idea/
+.claude/
+graphify-out/
+
+# local-only assets (screenshots of issues)
+issue/
